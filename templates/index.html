@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Calvert Hall Chatbot</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='ch-logo.png') }}">
+</head>
+<body>
+  <header>
+    <div class="header-container">
+      <img src="{{ url_for('static', filename='ch-logo.png') }}" alt="Calvert Hall Logo" class="logo">
+      <h1>Calvert Hall Chatbot</h1>
+      <button id="theme-toggle">🌙</button>
+    </div>
+  </header>
+
+  <main>
+    <div id="chat-box"></div>
+
+    <!-- 🔄 Loading Spinner -->
+    <div id="loader" class="hidden">
+      <div class="spinner"></div>
+    </div>
+
+    <form id="chat-form">
+      <input type="text" id="message" placeholder="Ask me a question..." required />
+      <button type="submit">Send</button>
+    </form>
+  </main>
+
+  <script>
+    const chatBox = document.getElementById("chat-box");
+    const chatForm = document.getElementById("chat-form");
+    const messageInput = document.getElementById("message");
+    const themeToggle = document.getElementById("theme-toggle");
+    const loader = document.getElementById("loader");
+
+    let lastQuestion = "";
+    let topTopics = [];
+    let allTopics = [];
+
+    function addMessage(sender, text) {
+      const bubble = document.createElement("div");
+      bubble.classList.add("bubble", sender);
+      bubble.innerHTML = `<p>${text}</p>`;
+      chatBox.appendChild(bubble);
+      chatBox.scrollTop = chatBox.scrollHeight;
+
+      if (sender === "bot") {
+        const fallbackContainer = document.createElement("div");
+        fallbackContainer.className = "fallback-container";
+
+        const input = document.createElement("input");
+        input.type = "text";
+        input.placeholder = "Search related topics...";
+        input.classList.add("topic-search");
+
+        const listDiv = document.createElement("div");
+        listDiv.className = "topic-list";
+
+        function renderTopics(filter = "") {
+          listDiv.innerHTML = "";
+
+          const filtered = [...new Set([
+            ...topTopics,
+            ...allTopics.filter(t =>
+              !topTopics.includes(t) &&
+              t.toLowerCase().includes(filter.toLowerCase())
+            )
+          ])];
+
+          if (filtered.length === 0) {
+            listDiv.innerHTML = "<em>No matching topics found.</em>";
+            return;
+          }
+
+          filtered.forEach(topic => {
+            const btn = document.createElement("button");
+            btn.className = "topic-button";
+            btn.textContent = topic;
+            btn.onclick = (e) => {
+              e.preventDefault();
+              askWithTopic(topic);
+            };
+            listDiv.appendChild(btn);
+          });
+        }
+
+        input.addEventListener("input", () => renderTopics(input.value));
+        fallbackContainer.appendChild(input);
+        fallbackContainer.appendChild(listDiv);
+        bubble.appendChild(fallbackContainer);
+        renderTopics();
+      }
+    }
+
+    chatForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const message = messageInput.value.trim();
+      if (!message) return;
+
+      addMessage("user", message);
+      lastQuestion = message;
+      messageInput.value = "";
+
+      loader.classList.remove("hidden"); // Show loader
+
+      const res = await fetch("/ask", {
+        method: "POST",
+        body: new URLSearchParams({ message }),
+      });
+
+      loader.classList.add("hidden"); // Hide loader
+
+      const data = await res.json();
+      topTopics = data.fallback_topics || [];
+      allTopics = data.all_topics || [];
+      addMessage("bot", data.message);
+    });
+
+    async function askWithTopic(topic) {
+      loader.classList.remove("hidden"); // Show loader
+
+      const res = await fetch("/ask_topic", {
+        method: "POST",
+        body: new URLSearchParams({ topic, question: lastQuestion }),
+      });
+
+      loader.classList.add("hidden"); // Hide loader
+
+      const data = await res.json();
+      addMessage("bot", data.message);
+    }
+
+    themeToggle.addEventListener("click", () => {
+      const html = document.documentElement;
+      const isLight = html.getAttribute("data-theme") === "light";
+      html.setAttribute("data-theme", isLight ? "dark" : "light");
+      themeToggle.textContent = isLight ? "☀️" : "🌙";
+    });
+  </script>
+</body>
+</html>
