@@ -11,7 +11,7 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 INDEX_PATH = "vector_index.faiss"
 META_PATH = "index_metadata.pkl"
 EMBED_MODEL = "text-embedding-3-small"
-CHAT_MODEL = "gpt-4"
+CHAT_MODEL = "gpt-4o-mini"
 TOP_K = 3
 
 from openai import OpenAI
